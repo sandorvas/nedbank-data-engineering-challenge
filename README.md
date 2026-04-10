@@ -1,163 +1,187 @@
-# Nedbank DE Challenge — Starter Kit
+Nedbank Data Engineering Challenge
 
-This directory is your starting point for the Data Engineering track.
+Medallion Architecture Pipeline (PySpark + Delta Lake)
 
-It contains a minimal scaffold that handles the Docker interface without
-implementing any pipeline logic. Your task is to fill in the three pipeline
-modules and make the Gold layer output pass the validation queries.
+⸻
 
----
+🧭 Overview
 
-## Quick Start
+This project implements a Medallion Architecture data pipeline using PySpark and Delta Lake, fully containerized with Docker.
 
-### 1. Pull the base image
+The pipeline processes raw banking datasets into a structured analytical model:
+	•	Bronze → Raw ingestion
+	•	Silver → Cleaned and standardized data
+	•	Gold → Dimensional model for analytics
 
-```bash
-docker pull nedbank-de-challenge/base:1.0
-```
+⸻
 
-If you cannot pull it, build it locally from the provided `Dockerfile.base`:
+🏗️ Architecture
 
-```bash
-docker build -t nedbank-de-challenge/base:1.0 -f ../Dockerfile.base ..
-```
+Raw Data (CSV / JSONL)
+        ↓
+    Bronze Layer
+    (Raw + ingestion timestamp)
+        ↓
+    Silver Layer
+    (Cleaned + standardized)
+        ↓
+    Gold Layer
+    (Dimensional Model)
 
-### 2. Place sample data
 
-Copy the sample data files (provided in `sample_data/` in the challenge pack)
-to a local directory. The examples below use `/tmp/test-data`:
+⸻
 
-```bash
-mkdir -p /tmp/test-data/input /tmp/test-data/config
-cp ../sample_data/accounts_sample.csv     /tmp/test-data/input/accounts.csv
-cp ../sample_data/transactions_sample.jsonl /tmp/test-data/input/transactions.jsonl
-cp ../sample_data/customers_sample.csv    /tmp/test-data/input/customers.csv
-cp config/pipeline_config.yaml            /tmp/test-data/config/
-```
+🧱 Data Model (Gold Layer)
 
-### 3. Implement the pipeline
+📊 fact_transactions
+	•	transaction_sk (PK)
+	•	account_sk (FK)
+	•	customer_sk (FK)
+	•	transaction_id
+	•	transaction_date
+	•	transaction_timestamp
+	•	transaction_type
+	•	merchant_category
+	•	merchant_subcategory
+	•	amount
+	•	currency
+	•	channel
+	•	province
+	•	dq_flag
+	•	ingestion_timestamp
 
-Open and implement the three pipeline modules:
+⸻
 
-| File | Layer | What to build |
-|---|---|---|
-| `pipeline/ingest.py` | Bronze | Read raw source files → Delta tables |
-| `pipeline/transform.py` | Silver | Deduplicate, type-cast, DQ-flag → Delta tables |
-| `pipeline/provision.py` | Gold | Join, aggregate, surrogate keys → scored output |
+👤 dim_customers
+	•	customer_sk (PK)
+	•	customer_id
+	•	gender
+	•	province
+	•	income_band
+	•	segment
+	•	risk_score
+	•	kyc_status
+	•	age_band
 
-Stage 3 only: also implement `pipeline/stream_ingest.py`.
+⸻
 
-### 4. Build your image
+🏦 dim_accounts
+	•	account_sk (PK)
+	•	account_id
+	•	customer_id
+	•	account_type
+	•	account_status
+	•	open_date
+	•	product_tier
+	•	digital_channel
+	•	credit_limit
+	•	current_balance
+	•	last_activity_date
 
-```bash
-docker build -t my-submission:test .
-```
+⸻
 
-### 5. Run locally with scoring-equivalent constraints
+⚙️ Key Design Decisions
 
-```bash
-docker run --rm \
-  --network=none \
-  --memory=2g --memory-swap=2g \
-  --cpus=2 \
-  --read-only \
-  --tmpfs /tmp:rw,size=512m \
-  -v /tmp/test-data:/data \
-  my-submission:test
+✅ Medallion Architecture
+	•	Clear separation of concerns
+	•	Scalable and industry standard
+	•	Supports incremental enhancements
 
-echo "Exit code: $?"
-```
+⸻
 
-Your pipeline must exit with code 0 for the scoring system to read your output.
+✅ Deterministic Surrogate Keys
+	•	Implemented using xxhash64
+	•	Ensures:
+	•	Stability across re-runs
+	•	Idempotent pipeline behavior
 
-### 6. Verify your output
+⸻
 
-```bash
-ls /tmp/test-data/output/bronze/
-ls /tmp/test-data/output/silver/
-ls /tmp/test-data/output/gold/
-```
+✅ Config-Driven Pipeline
+	•	No hardcoded paths
+	•	Uses /data/config/pipeline_config.yaml
+	•	Enables portability and reproducibility
 
-### 7. Run the local testing harness
+⸻
 
-From the challenge pack root (the directory containing `run_tests.sh`):
+✅ Delta Lake
+	•	ACID transactions
+	•	Schema enforcement
+	•	Efficient storage (Parquet-based)
 
-```bash
-bash run_tests.sh --stage 1 --data-dir /tmp/test-data --image my-submission:test
-```
+⸻
 
-All 7 checks must pass before you submit.
+✅ Idempotency
+	•	Pipeline can be re-run safely
+	•	Outputs remain consistent for same inputs
 
----
+⸻
 
-## Repository Layout
+🚀 How to Run
 
-```
-your-submission/
-├── Dockerfile                      # Extends nedbank-de-challenge/base:1.0
-├── requirements.txt                # Your extra Python dependencies (may be empty)
-├── pipeline/
-│   ├── __init__.py
-│   ├── run_all.py                  # Entry point — do not rename
-│   ├── ingest.py                   # Bronze layer — implement this
-│   ├── transform.py                # Silver layer — implement this
-│   ├── provision.py                # Gold layer — implement this
-│   └── stream_ingest.py            # Stage 3 only — implement at Stage 3
-├── config/
-│   ├── pipeline_config.yaml        # Paths and Spark settings
-│   └── dq_rules.yaml               # DQ rules (required from Stage 2)
-├── stream/                             # Stage 3 stream data for local testing
-│   ├── .gitkeep
-│   └── README.md
-├── adr/
-│   └── stage3_adr.md               # Architecture Decision Record (Stage 3 only)
-└── README.md                       # This file
-```
+1. Build Docker Image
 
-**Important:** Do not commit the `output/` directory. It is already in `.gitignore`.
+docker build -t nedbank-pipeline .
 
-The `stream/` directory is used for Stage 3 local testing. Place the 12 stream batch
-files there when you reach Stage 3. The `.jsonl` data files are excluded via `.gitignore`
-— only `.gitkeep` and the README should be committed.
 
----
+⸻
 
-## Submission Tags
+2. Run Pipeline
 
-| Stage | Tag | Deadline |
-|---|---|---|
-| Stage 1 | `stage1-submission` | End of Day 7 |
-| Stage 2 | `stage2-submission` | End of Day 14 |
-| Stage 3 | `stage3-submission` | End of Day 21 |
+docker run \
+  -v $(pwd)/../data:/data/input \
+  -v $(pwd)/config:/data/config \
+  -v $(pwd)/data/output:/data/output \
+  nedbank-pipeline
 
-```bash
-git tag -a stage1-submission -m "Stage 1 submission"
-git push origin stage1-submission
-```
 
----
+⸻
 
-## Key References
+📂 Project Structure
 
-| Document | What it covers |
-|---|---|
-| `docker_interface_contract.md` | Mount points, invocation flags, exit codes |
-| `output_schema_spec.md` | Exact field names, types, and derivation rules |
-| `submission_guide.md` | Tagging protocol, common mistakes, verification steps |
-| `resource_constraints.md` | Memory (2 GB), CPU (2 vCPU), network (none) |
-| `validation_queries.sql` | Three SQL queries the scorer runs against your Gold layer |
-| `data_dictionary.md` | Source field definitions and data types |
+pipeline/
+  ingest.py        → Bronze ingestion
+  transform.py     → Silver transformation
+  provision.py     → Gold layer (dimensions + fact)
+  run_all.py       → Pipeline entrypoint
 
----
+config/
+  pipeline_config.yaml
+  dq_rules.yaml
 
-## Resource Limits (summary)
+Dockerfile
+requirements.txt
 
-| Resource | Limit |
-|---|---|
-| RAM | 2 GB hard ceiling |
-| CPU | 2 vCPU — use `local[2]` for Spark |
-| Wall-clock time | 30 minutes |
-| Network | None during execution |
-| Writable paths | `/data/output/` and `/tmp` (512 MB) only |
 
-See `resource_constraints.md` for practical guidance on working within these limits.
+⸻
+
+🧠 Assumptions & Trade-offs
+	•	merchant_subcategory not present → set to NULL
+	•	Age derived from DOB using year approximation
+	•	Decimal casting applied for financial fields
+	•	Inner joins used to ensure referential integrity
+
+⸻
+
+🧪 Data Quality
+	•	Deduplication applied at each stage
+	•	Referential integrity enforced in Gold layer
+	•	Null foreign keys avoided (validated)
+
+⸻
+
+🏁 Summary
+
+This solution demonstrates:
+	•	End-to-end data pipeline design
+	•	Strong data modeling practices
+	•	Production-oriented engineering (Docker, config-driven)
+	•	Clean and maintainable PySpark code
+
+⸻
+
+👤 Author
+
+Sandor Vas
+Data Engineer / Solution Architect
+Johannesburg, South Africa

@@ -27,7 +27,7 @@ Raw Data (CSV / JSONL)
         ↓
     Gold Layer
     (Dimensional Model)
-
+```mermaid
 flowchart TD
 
     %% =========================
@@ -67,7 +67,7 @@ flowchart TD
 
     D1 --> F
     D2 --> F
-
+```
 ⸻
 
 🧱 Data Model (Gold Layer)

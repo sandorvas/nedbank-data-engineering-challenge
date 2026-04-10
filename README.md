@@ -28,6 +28,45 @@ Raw Data (CSV / JSONL)
     Gold Layer
     (Dimensional Model)
 
+flowchart TD
+
+    %% =========================
+    %% INPUT
+    %% =========================
+    A[Raw Data<br/>CSV / JSONL]
+
+    %% =========================
+    %% BRONZE
+    %% =========================
+    B[Bronze Layer<br/>Raw Ingestion<br/>+ ingestion_timestamp]
+
+    %% =========================
+    %% SILVER
+    %% =========================
+    C[Silver Layer<br/>Cleaned & Standardized]
+
+    %% =========================
+    %% GOLD DIMENSIONS
+    %% =========================
+    D1[dim_customers<br/>customer_sk]
+    D2[dim_accounts<br/>account_sk]
+
+    %% =========================
+    %% GOLD FACT
+    %% =========================
+    F[fact_transactions<br/>transaction_sk<br/>FKs → account_sk, customer_sk]
+
+    %% =========================
+    %% FLOW
+    %% =========================
+    A --> B
+    B --> C
+
+    C --> D1
+    C --> D2
+
+    D1 --> F
+    D2 --> F
 
 ⸻
 

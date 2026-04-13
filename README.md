@@ -12,6 +12,7 @@ The solution transforms raw transaction, account, and customer data into:
 
 Architecture
 
+```mermaid
 flowchart LR
     A[Transactions JSONL] --> B[Clean / DQ]
     C[Accounts CSV] --> B
@@ -25,6 +26,7 @@ flowchart LR
     H --> I[Risk Scoring]
     I --> J[Delta Lake Storage]
     J --> K[DuckDB Analytics]
+```
 
 Technology Stack
 	•	Apache Spark (PySpark)

@@ -1,200 +1,169 @@
-# 🏦 Nedbank Data Engineering Challenge  
-### Gold Layer Pipeline (Spark + Delta + DuckDB)
+🚀 FINAL STEPS — Nedbank Submission (All-in-One)
 
----
+⸻
+
+✅ STEP B — README.md (Replace Entire File)
+
+# Nedbank Data Engineering Challenge
 
 ## 🚀 Overview
+This project implements a full Gold-layer data pipeline using:
+- Apache Spark
+- Delta Lake
+- DuckDB
 
-This project implements a **modern data engineering pipeline**:
-
-- 🔹 Bronze → Raw ingestion (JSON / CSV)
-- 🔹 Silver → Cleaning & enrichment
-- 🔹 Gold → Star schema (Dimensions + Fact)
-
-Technologies used:
-
-- Apache Spark (PySpark)
-- Delta Lake (ACID storage)
-- DuckDB (analytical querying)
+It transforms raw transactional data into:
+- Dimensional models (customers, accounts)
+- Enriched fact table
+- Behavioral intelligence signals
+- Composite risk scoring
 
 ---
 
-## 🧱 Architecture
+## 🏗️ Architecture
 
 ```mermaid
 flowchart LR
 
-    A[Raw Data<br/>JSON / CSV] --> B[Bronze Layer]
-    B --> C[Silver Layer<br/>Clean + DQ]
-    C --> D[Gold Layer<br/>Star Schema]
+A[Transactions JSONL] --> B[Clean / DQ]
+C[Accounts CSV] --> B
+D[Customers CSV] --> B
 
-    D --> E[Delta Tables]
-    E --> F[DuckDB Analytics]
+B --> E[Dim Customers]
+B --> F[Dim Accounts]
+B --> G[Fact Transactions]
 
-    style A fill:#1f77b4,color:#fff
-    style D fill:#2ca02c,color:#fff
-    style F fill:#ff7f0e,color:#fff
-```
+G --> H[Velocity Detection]
+H --> I[Risk Scoring]
 
----
+I --> J[Delta Lake Storage]
+J --> K[DuckDB Analytics]
 
-## 📊 Data Model (Gold Layer)
 
-### Dimensions
+⸻
 
-- `dim_customers`
-- `dim_accounts`
+🧠 Intelligence Layer
 
-### Fact Table
+The pipeline enriches transactions with:
 
-- `fact_transactions`
+1. Velocity Detection
+	•	Transactions per customer per hour
+	•	Detects rapid activity bursts
 
----
+2. Channel Risk
+	•	ATM / USSD → HIGH
+	•	POS → MEDIUM
+	•	Others → LOW
 
-## ⚙️ Pipeline Features
+3. High Value Detection
+	•	Flags unusually large transactions
 
-### ✅ Data Quality (DQ)
-- Deduplication (transaction_id, account_id, customer_id)
-- Null checks on critical fields
-- Currency validation (ZAR standardization)
+⸻
 
-### ✅ Surrogate Keys
-- Deterministic BIGINT keys using `xxhash64`
-- Stable across reruns
+🎯 Composite Risk Score
 
-### ✅ Delta Lake
-- ACID-compliant tables
-- Schema evolution enabled
-- Safe overwrite for development
+risk_score = velocity + amount + channel
 
-### ✅ Time Handling (IMPORTANT)
-- Spark session forced to **UTC**
-- All timestamps stored as **timezone-neutral**
-- Ensures compatibility with DuckDB
+⸻
 
----
+📊 Risk Bands
 
-## 🔎 Analytics (DuckDB)
+Band	Meaning
+LOW	Normal
+MEDIUM	Slight anomaly
+HIGH	Elevated risk
+CRITICAL	Rare extreme anomaly
 
-Example query:
 
-```sql
-SELECT
-    province,
-    COUNT(*) AS transactions,
-    SUM(amount) AS total_amount,
-    AVG(amount) AS avg_transaction
-FROM delta_scan('../output/gold/fact_transactions')
-GROUP BY province
-ORDER BY total_amount DESC;
-```
+⸻
 
----
+🔥 Key Finding
 
-## 🧠 Key Insights
+Detected a customer performing multiple transactions across different channels within a short time window with escalating values — indicating anomalous behaviour.
 
-### 1. Geographic distribution
-- Transaction volume varies significantly by province
-- Gauteng dominates total activity
+⸻
 
-### 2. Channel behavior
-- POS and APP dominate transaction volume
-- All channels show similar average transaction values
+💾 Storage
+	•	Delta Lake
+	•	Partitioned by: province, transaction_date
+	•	Queryable via DuckDB
 
-### 3. Merchant analysis
-- Categories differ in volume
-- BUT average transaction size is consistent
+⸻
 
----
+🧪 Example Query
 
-## 🚨 Critical Finding
-
-> **Transaction values are statistically distributed but not behaviorally segmented**
-
-- Wide value range: `1 → 50,000`
-- Standard deviation: ~1283
-- BUT:
-  - Same average (~720) across:
-    - provinces
-    - channels
-    - merchant categories
-
----
-
-## 💥 Interpretation
-
-This suggests:
-
-- Data has **statistical realism**
-- BUT lacks **domain-driven behavior**
-
-👉 Likely:
-- Synthetic dataset
-- Normalized transaction generator
-- Anonymized data with removed signal
-
----
-
-## 🏆 Key Statement
-
-> “The dataset preserves statistical variability but removes behavioral differentiation, limiting its usefulness for real-world decision-making.”
-
----
-
-## ▶️ How to Run
-
-```bash
-python pipeline/gold.py
-```
-
----
-
-## 🧪 Query with DuckDB
-
-```python
 import duckdb
-
 con = duckdb.connect()
 con.execute("LOAD delta")
 
-df = con.execute("""
-SELECT *
+con.execute("""
+SELECT risk_band, COUNT(*)
 FROM delta_scan('../output/gold/fact_transactions')
-LIMIT 5
+GROUP BY risk_band
 """).df()
 
-print(df)
-```
+
+⸻
+
+🎯 Outcome
+
+This pipeline introduces:
+	•	Behavioral anomaly detection
+	•	Explainable risk scoring
+	•	Analytics-ready datasets
+
+⸻
+
+👤 Author
+
+Sandor Vas
 
 ---
 
-## 📦 Output
+# ✅ STEP C — Git (Commit + Push)
 
-```
-output/gold/
-├── dim_customers/
-├── dim_accounts/
-└── fact_transactions/
-```
+Run:
 
----
-
-## 🧠 Author Perspective
-
-This project demonstrates:
-
-- End-to-end data pipeline design
-- Delta Lake production patterns
-- Analytical validation beyond dashboards
-- Critical evaluation of data realism
+git add README.md pipeline/gold.py
+git commit -m “Add intelligence layer with velocity + risk scoring + README”
+git push
 
 ---
 
-## 🚀 Next Steps
+# ✅ STEP A — Pipeline Change (risk_band)
 
-- Add time-series analysis
-- Introduce behavioral segmentation
-- Build anomaly detection layer
-- Deploy pipeline to cloud (GCP / AWS)
+Inside `build_fact()` AFTER `risk_score` add:
+
+enriched = enriched.withColumn(
+“risk_band”,
+when(col(“risk_score”) > 3, “CRITICAL”)
+.when(col(“risk_score”) > 2, “HIGH”)
+.when(col(“risk_score”) > 1, “MEDIUM”)
+.otherwise(“LOW”)
+)
 
 ---
+
+# ▶️ Re-run Pipeline
+
+rm -rf ../output/gold/*
+python pipeline/gold.py
+
+---
+
+# ▶️ Validate in DuckDB
+
+import duckdb
+
+con = duckdb.connect()
+con.execute(“LOAD delta”)
+
+con.execute(”””
+SELECT risk_band, COUNT(*) AS cnt
+FROM delta_scan(’../output/gold/fact_transactions’)
+GROUP BY risk_band
+ORDER BY cnt DESC
+“””).df()
+
+---
+

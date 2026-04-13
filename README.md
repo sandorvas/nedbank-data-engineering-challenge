@@ -1,226 +1,200 @@
-Nedbank Data Engineering Challenge
+# 🏦 Nedbank Data Engineering Challenge  
+### Gold Layer Pipeline (Spark + Delta + DuckDB)
 
-Medallion Architecture Pipeline (PySpark + Delta Lake)
+---
 
-⸻
+## 🚀 Overview
 
-🧭 Overview
+This project implements a **modern data engineering pipeline**:
 
-This project implements a Medallion Architecture data pipeline using PySpark and Delta Lake, fully containerized with Docker.
+- 🔹 Bronze → Raw ingestion (JSON / CSV)
+- 🔹 Silver → Cleaning & enrichment
+- 🔹 Gold → Star schema (Dimensions + Fact)
 
-The pipeline processes raw banking datasets into a structured analytical model:
-	•	Bronze → Raw ingestion
-	•	Silver → Cleaned and standardized data
-	•	Gold → Dimensional model for analytics
+Technologies used:
 
-⸻
+- Apache Spark (PySpark)
+- Delta Lake (ACID storage)
+- DuckDB (analytical querying)
 
-🏗️ Architecture
+---
 
-Raw Data (CSV / JSONL)
-        ↓
-    Bronze Layer
-    (Raw + ingestion timestamp)
-        ↓
-    Silver Layer
-    (Cleaned + standardized)
-        ↓
-    Gold Layer
-    (Dimensional Model)
+## 🧱 Architecture
+
 ```mermaid
-flowchart TD
+flowchart LR
 
-    %% =========================
-    %% INPUT
-    %% =========================
-    A[Raw Data<br/>CSV / JSONL]
+    A[Raw Data<br/>JSON / CSV] --> B[Bronze Layer]
+    B --> C[Silver Layer<br/>Clean + DQ]
+    C --> D[Gold Layer<br/>Star Schema]
 
-    %% =========================
-    %% BRONZE
-    %% =========================
-    B[Bronze Layer<br/>Raw Ingestion<br/>+ ingestion_timestamp]
+    D --> E[Delta Tables]
+    E --> F[DuckDB Analytics]
 
-    %% =========================
-    %% SILVER
-    %% =========================
-    C[Silver Layer<br/>Cleaned & Standardized]
-
-    %% =========================
-    %% GOLD DIMENSIONS
-    %% =========================
-    D1[dim_customers<br/>customer_sk]
-    D2[dim_accounts<br/>account_sk]
-
-    %% =========================
-    %% GOLD FACT
-    %% =========================
-    F[fact_transactions<br/>transaction_sk<br/>FKs → account_sk, customer_sk]
-
-    %% =========================
-    %% FLOW
-    %% =========================
-    A --> B
-    B --> C
-
-    C --> D1
-    C --> D2
-
-    D1 --> F
-    D2 --> F
+    style A fill:#1f77b4,color:#fff
+    style D fill:#2ca02c,color:#fff
+    style F fill:#ff7f0e,color:#fff
 ```
-⸻
 
-🧱 Data Model (Gold Layer)
+---
 
-📊 fact_transactions
-	•	transaction_sk (PK)
-	•	account_sk (FK)
-	•	customer_sk (FK)
-	•	transaction_id
-	•	transaction_date
-	•	transaction_timestamp
-	•	transaction_type
-	•	merchant_category
-	•	merchant_subcategory
-	•	amount
-	•	currency
-	•	channel
-	•	province
-	•	dq_flag
-	•	ingestion_timestamp
+## 📊 Data Model (Gold Layer)
 
-⸻
+### Dimensions
 
-👤 dim_customers
-	•	customer_sk (PK)
-	•	customer_id
-	•	gender
-	•	province
-	•	income_band
-	•	segment
-	•	risk_score
-	•	kyc_status
-	•	age_band
+- `dim_customers`
+- `dim_accounts`
 
-⸻
+### Fact Table
 
-🏦 dim_accounts
-	•	account_sk (PK)
-	•	account_id
-	•	customer_id
-	•	account_type
-	•	account_status
-	•	open_date
-	•	product_tier
-	•	digital_channel
-	•	credit_limit
-	•	current_balance
-	•	last_activity_date
+- `fact_transactions`
 
-⸻
+---
 
-⚙️ Key Design Decisions
+## ⚙️ Pipeline Features
 
-✅ Medallion Architecture
-	•	Clear separation of concerns
-	•	Scalable and industry standard
-	•	Supports incremental enhancements
+### ✅ Data Quality (DQ)
+- Deduplication (transaction_id, account_id, customer_id)
+- Null checks on critical fields
+- Currency validation (ZAR standardization)
 
-⸻
+### ✅ Surrogate Keys
+- Deterministic BIGINT keys using `xxhash64`
+- Stable across reruns
 
-✅ Deterministic Surrogate Keys
-	•	Implemented using xxhash64
-	•	Ensures:
-	•	Stability across re-runs
-	•	Idempotent pipeline behavior
+### ✅ Delta Lake
+- ACID-compliant tables
+- Schema evolution enabled
+- Safe overwrite for development
 
-⸻
+### ✅ Time Handling (IMPORTANT)
+- Spark session forced to **UTC**
+- All timestamps stored as **timezone-neutral**
+- Ensures compatibility with DuckDB
 
-✅ Config-Driven Pipeline
-	•	No hardcoded paths
-	•	Uses /data/config/pipeline_config.yaml
-	•	Enables portability and reproducibility
+---
 
-⸻
+## 🔎 Analytics (DuckDB)
 
-✅ Delta Lake
-	•	ACID transactions
-	•	Schema enforcement
-	•	Efficient storage (Parquet-based)
+Example query:
 
-⸻
+```sql
+SELECT
+    province,
+    COUNT(*) AS transactions,
+    SUM(amount) AS total_amount,
+    AVG(amount) AS avg_transaction
+FROM delta_scan('../output/gold/fact_transactions')
+GROUP BY province
+ORDER BY total_amount DESC;
+```
 
-✅ Idempotency
-	•	Pipeline can be re-run safely
-	•	Outputs remain consistent for same inputs
+---
 
-⸻
+## 🧠 Key Insights
 
-🚀 How to Run
+### 1. Geographic distribution
+- Transaction volume varies significantly by province
+- Gauteng dominates total activity
 
-1. Build Docker Image
+### 2. Channel behavior
+- POS and APP dominate transaction volume
+- All channels show similar average transaction values
 
-docker build -t nedbank-pipeline .
+### 3. Merchant analysis
+- Categories differ in volume
+- BUT average transaction size is consistent
 
+---
 
-⸻
+## 🚨 Critical Finding
 
-2. Run Pipeline
+> **Transaction values are statistically distributed but not behaviorally segmented**
 
-docker run \
-  -v $(pwd)/../data:/data/input \
-  -v $(pwd)/config:/data/config \
-  -v $(pwd)/data/output:/data/output \
-  nedbank-pipeline
+- Wide value range: `1 → 50,000`
+- Standard deviation: ~1283
+- BUT:
+  - Same average (~720) across:
+    - provinces
+    - channels
+    - merchant categories
 
+---
 
-⸻
+## 💥 Interpretation
 
-📂 Project Structure
+This suggests:
 
-pipeline/
-  ingest.py        → Bronze ingestion
-  transform.py     → Silver transformation
-  provision.py     → Gold layer (dimensions + fact)
-  run_all.py       → Pipeline entrypoint
+- Data has **statistical realism**
+- BUT lacks **domain-driven behavior**
 
-config/
-  pipeline_config.yaml
-  dq_rules.yaml
+👉 Likely:
+- Synthetic dataset
+- Normalized transaction generator
+- Anonymized data with removed signal
 
-Dockerfile
-requirements.txt
+---
 
+## 🏆 Key Statement
 
-⸻
+> “The dataset preserves statistical variability but removes behavioral differentiation, limiting its usefulness for real-world decision-making.”
 
-🧠 Assumptions & Trade-offs
-	•	merchant_subcategory not present → set to NULL
-	•	Age derived from DOB using year approximation
-	•	Decimal casting applied for financial fields
-	•	Inner joins used to ensure referential integrity
+---
 
-⸻
+## ▶️ How to Run
 
-🧪 Data Quality
-	•	Deduplication applied at each stage
-	•	Referential integrity enforced in Gold layer
-	•	Null foreign keys avoided (validated)
+```bash
+python pipeline/gold.py
+```
 
-⸻
+---
 
-🏁 Summary
+## 🧪 Query with DuckDB
 
-This solution demonstrates:
-	•	End-to-end data pipeline design
-	•	Strong data modeling practices
-	•	Production-oriented engineering (Docker, config-driven)
-	•	Clean and maintainable PySpark code
+```python
+import duckdb
 
-⸻
+con = duckdb.connect()
+con.execute("LOAD delta")
 
-👤 Author
+df = con.execute("""
+SELECT *
+FROM delta_scan('../output/gold/fact_transactions')
+LIMIT 5
+""").df()
 
-Sandor Vas
-Data Engineer / Solution Architect
-Johannesburg, South Africa
+print(df)
+```
+
+---
+
+## 📦 Output
+
+```
+output/gold/
+├── dim_customers/
+├── dim_accounts/
+└── fact_transactions/
+```
+
+---
+
+## 🧠 Author Perspective
+
+This project demonstrates:
+
+- End-to-end data pipeline design
+- Delta Lake production patterns
+- Analytical validation beyond dashboards
+- Critical evaluation of data realism
+
+---
+
+## 🚀 Next Steps
+
+- Add time-series analysis
+- Introduce behavioral segmentation
+- Build anomaly detection layer
+- Deploy pipeline to cloud (GCP / AWS)
+
+---

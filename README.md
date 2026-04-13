@@ -38,7 +38,7 @@ H --> I[Risk Scoring]
 
 I --> J[Delta Lake Storage]
 J --> K[DuckDB Analytics]
-
+```
 
 ⸻
 

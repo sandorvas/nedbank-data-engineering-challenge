@@ -5,6 +5,7 @@ Overview
 This repository implements a Gold-layer data pipeline for transaction analytics using Apache Spark, Delta Lake, and DuckDB.
 
 The solution transforms raw transaction, account, and customer data into:
+
 	•	dimensional models
 	•	an enriched fact table
 	•	behavioral risk indicators
@@ -33,6 +34,7 @@ Architecture
 ⸻
 
 Technology Stack
+
 	•	Apache Spark (PySpark)
 	•	Delta Lake
 	•	DuckDB
@@ -43,17 +45,20 @@ Technology Stack
 Gold Layer Outputs
 
 The pipeline writes the following Delta tables:
+
 	•	output/gold/dim_customers
 	•	output/gold/dim_accounts
 	•	output/gold/fact_transactions
 
 Partitioning:
+
 	•	province
 	•	transaction_date
 
 ⸻
 
-Data Quality Controls
+Data Quality Controls:
+
 	•	deduplication by transaction_id
 	•	null checks on critical fields
 	•	currency validation (ZAR)
@@ -64,6 +69,7 @@ Data Quality Controls
 Intelligence Layer
 
 The fact table includes:
+
 	•	high_value_flag
 	•	channel_risk
 	•	txn_hour
@@ -74,14 +80,15 @@ The fact table includes:
 ⸻
 
 Key Findings
+
 	1.	Regional concentration
-Gauteng leads both transaction volume and total value.
+		Gauteng leads both transaction volume and total value.
 	2.	High-value transactions
-Rare but carry disproportionate financial exposure.
+		Rare but carry disproportionate financial exposure.
 	3.	Velocity detection
-Identifies rare behavioral spikes.
+		Identifies rare behavioral spikes.
 	4.	Risk scoring
-Produces realistic separation between normal and anomalous behavior.
+		Produces realistic separation between normal and anomalous behavior.
 
 ⸻
 
@@ -105,26 +112,26 @@ Northern Cape    30,495          21,660,100     710.28
 Velocity Distribution
 
 Velocity Flag	Transactions	Avg Velocity
-LOW	999,945	1.0023
-MEDIUM	51	3.0
-HIGH	4	4.0
+	 LOW	999,945		1.0023
+	 MEDIUM	51		3.0
+	 HIGH	4		4.0
 
 
 ⸻
 
 Risk Score Distribution
 
-Risk Score	Count
-4.5	1
-4.0	1
-3.5	3
-3.0	3,114
-2.5	4,714
-2.0	19,292
-1.5	20,938
-1.0	238,740
-0.5	324,643
-0.0	388,554
+Risk 	Score	Count
+	4.5	1
+	4.0	1
+	3.5	3
+	3.0	3,114
+	2.5	4,714
+	2.0	19,292
+	1.5	20,938
+	1.0	238,740
+	0.5	324,643
+	0.0	388,554
 
 
 ⸻
@@ -162,6 +169,7 @@ GROUP BY risk_score
 ⸻
 
 📦 Version History
+
 	•	v3.0 — Explainability layer (risk_band, why_flagged)
 	•	v2.2 — Final submission baseline with validated analytics
 	•	v2.1 — Intelligence layer (velocity, channel risk, high-value detection)

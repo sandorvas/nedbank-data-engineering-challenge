@@ -112,59 +112,6 @@ This pipeline introduces:
 	•	Explainable risk scoring
 	•	Analytics-ready datasets
 
-⸻
-
-👤 Author
-
-Sandor Vas
-
----
-
-# ✅ STEP C — Git (Commit + Push)
-
-Run:
-
-git add README.md pipeline/gold.py
-git commit -m “Add intelligence layer with velocity + risk scoring + README”
-git push
-
----
-
-# ✅ STEP A — Pipeline Change (risk_band)
-
-Inside `build_fact()` AFTER `risk_score` add:
-
-enriched = enriched.withColumn(
-“risk_band”,
-when(col(“risk_score”) > 3, “CRITICAL”)
-.when(col(“risk_score”) > 2, “HIGH”)
-.when(col(“risk_score”) > 1, “MEDIUM”)
-.otherwise(“LOW”)
-)
-
----
-
-# ▶️ Re-run Pipeline
-
-rm -rf ../output/gold/*
-python pipeline/gold.py
-
----
-
-# ▶️ Validate in DuckDB
-
-import duckdb
-
-con = duckdb.connect()
-con.execute(“LOAD delta”)
-
-con.execute(”””
-SELECT risk_band, COUNT(*) AS cnt
-FROM delta_scan(’../output/gold/fact_transactions’)
-GROUP BY risk_band
-ORDER BY cnt DESC
-“””).df()
-
 ---
 
 ## Version History
@@ -175,3 +122,7 @@ ORDER BY cnt DESC
 - **v1.0** — Initial Gold pipeline baseline
 
 ---
+
+👤 Author
+
+Sandor Vas

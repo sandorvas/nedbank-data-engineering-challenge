@@ -169,6 +169,7 @@ ORDER BY cnt DESC
 
 ## Version History
 
+- **v2.2** — Final submission: README fix + risk scoring pipeline + updated README
 - **v2.1** — Current submission baseline: Gold pipeline + intelligence layer + risk scoring + updated README
 - **v2.0** — Added velocity detection and composite risk scoring
 - **v1.0** — Initial Gold pipeline baseline

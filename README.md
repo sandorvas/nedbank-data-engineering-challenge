@@ -15,8 +15,8 @@ The solution transforms raw transaction, account, and customer data into:
 Architecture
 
 ```mermaid
-flowchart LR
-    A[Transactions JSONL] --> B[Clean / DQ]
+   flowchart LR
+    A[Transactions JSONL] --> B[Clean & DQ]
     C[Accounts CSV] --> B
     D[Customers CSV] --> B
 

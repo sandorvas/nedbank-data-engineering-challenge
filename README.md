@@ -92,7 +92,7 @@ Key Findings
 
 ⸻
 
-DuckDB Results
+DuckDB Results 
 
 Province Summary
 

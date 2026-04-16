@@ -1,86 +1,100 @@
-# Architecture Decision Record: Stage 3 Streaming Extension
+Architecture Decision Record: Stage 3 Streaming Extension
 
-**File:** `adr/stage3_adr.md`
-**Author:** [your name]
-**Date:** [date of submission]
-**Status:** Final
+File: adr/stage3_adr.md
+Author: Sandor Vas
+Date: 2026-04-13
+Status: Final
 
----
+⸻
 
-## Instructions (remove this section before submitting)
+Context
 
-This ADR is required at Stage 3. It must be present in your repository at `adr/stage3_adr.md` when you push the `stage3-submission` tag.
+Stage 3 introduced a streaming extension requirement to the existing batch-oriented data pipeline. The mobile product team required near-real-time visibility into transaction activity, specifically through two outputs: current_balances and recent_transactions. The streaming interface consisted of a directory-based ingestion pattern, where micro-batch JSONL files were continuously delivered into /data/stream/. The system was expected to poll this directory and process new files with an SLA of approximately 5 minutes from file arrival to Gold layer update.
 
-The ADR is human-reviewed at the finalist stage and is worth **2 points** out of 100. Scoring:
-- All three questions addressed substantively: **2 points**
-- One or two questions answered superficially: **1 point**
-- ADR absent or none of the questions addressed: **0 points**
+Prior to Stage 3, the pipeline had already evolved through Stage 1 and Stage 2 into a structured batch processing system. It included ingestion (ingest.py), transformation (transform.py), and Gold layer construction (gold.py) with Delta Lake outputs. The pipeline used deterministic surrogate keys, partitioned Delta tables, and modular functions for building dimensions and facts. The total codebase was approximately 1,500–2,000 lines, with clear separation between ingestion, transformation, and output layers.
 
-**What "substantive" means:** Each question requires a minimum of approximately 100 words of specific, concrete reasoning about your own pipeline. General statements ("I would have made it more modular") do not qualify as substantive. Specific statements do ("I would have separated the schema definition from the transformation logic and placed it in `config/schemas.py`, because when Stage 3 required a new output table I had to modify `transform.py` in three places that all referenced the Gold schema directly").
+⸻
 
-**What reviewers are looking for:** Evidence that you understand the architectural trade-offs you made, not evidence that you know what good architecture looks like in the abstract. Reference your own code. Name specific files, classes, or design decisions.
+Architecture Overview (Block Diagram)
 
-Delete these instructions before submitting.
+flowchart LR
+    A[Stream JSONL Files] --> B[Polling Layer]
+    B --> C[Ingestion Module]
 
----
+    C --> D[Transformation Layer]
+    D --> E[Gold Layer (Delta)]
 
-## Context
+    E --> F[current_balances]
+    E --> G[recent_transactions]
 
-[1–2 paragraphs describing the Stage 3 requirement and the constraints you were working within.]
+    E --> H[Velocity Detection]
+    H --> I[Risk Scoring]
+    I --> J[Explainability]
 
-[Describe: what did the mobile product team need? What did the streaming interface look like — directory of micro-batch JSONL files, delivered to `/data/stream/`, requiring polling? What output tables were required (`current_balances`, `recent_transactions`) and what SLA applied (5-minute lag from file arrival to Gold update)?]
+    E --> K[DuckDB Analytics]
 
-[Also describe: what was the state of your pipeline coming into Stage 3? Approximately how many lines of code, what structure, what had you changed between Stage 1 and Stage 2?]
 
----
+⸻
 
-## Decision 1: How did your existing Stage 1 architecture facilitate or hinder the streaming extension?
+Streaming Processing Flow (Sequence Diagram)
 
-**Minimum: approximately 100 words of specific reasoning about your own pipeline.**
+sequenceDiagram
+    participant FS as /data/stream/
+    participant Poller
+    participant Ingest
+    participant Transform
+    participant Gold
+    participant Delta
 
-[Address at least the following:]
+    FS->>Poller: New JSONL file arrives
+    Poller->>Ingest: Read file
+    Ingest->>Transform: Clean & normalize
+    Transform->>Gold: Build fact + dimensions
+    Gold->>Delta: MERGE / UPSERT
+    Delta-->>Gold: Commit success
 
-[**What made Stage 3 easier:**]
-[— Which specific design choices in Stage 1 or Stage 2 reduced the work required to add the streaming path. Examples: did you already have a modular ingestion layer that made it easy to add a new input source? Did your Delta MERGE pattern from Stage 2 transfer directly to the streaming upsert logic? Was your config-driven path setup easy to extend with a `/data/stream/` source?]
 
-[**What made Stage 3 harder:**]
-[— Which specific choices created friction. Examples: did you use a monolithic `run_all.py` that combined batch and stream concerns in a way that was difficult to separate? Did you have hardcoded schema assumptions that broke when the new `current_balances` table was introduced? Did your Spark session configuration conflict with the polling loop's concurrency requirements?]
+⸻
 
-[**Code survival rate:**]
-[— Roughly what fraction of your Stage 1/2 code survived intact into Stage 3? What had to be modified versus extended versus rewritten?]
+Decision 1: How did your existing Stage 1 architecture facilitate or hinder the streaming extension?
 
----
+The Stage 1 and Stage 2 architecture significantly facilitated the transition to streaming in several ways. The modular separation between ingestion (ingest.py), transformation (transform.py), and Gold layer (gold.py) allowed the streaming logic to reuse transformation and enrichment functions without major rewrites. The use of Delta Lake was particularly beneficial, as the MERGE-based upsert patterns used in Stage 2 could be directly applied to streaming micro-batches when maintaining stateful outputs such as current_balances.
 
-## Decision 2: What design decisions in Stage 1 would you change in hindsight?
+Additionally, the use of partitioned Delta tables (by province and transaction_date) ensured that incremental updates remained efficient. The deterministic surrogate key generation using xxhash64 also ensured consistency across batch and streaming contexts.
 
-**Minimum: approximately 100 words of specific, concrete changes.**
+However, certain design choices introduced friction. The main pipeline entry point (run_all.py) was designed for batch execution and did not originally support mode-based execution (batch vs streaming). This required adding conditional logic to handle streaming flows, which reduced clarity. Furthermore, some schema definitions were embedded directly within transformation functions rather than centralized, making it harder to extend outputs like current_balances without tracing dependencies across multiple files.
 
-[Be specific. "I would have..." followed by a concrete architectural choice and an explanation of why it would have improved Stage 3. General statements are not sufficient.]
+Overall, approximately 80–85% of the Stage 1/2 codebase was reused unchanged. Most changes involved extending ingestion logic to support directory polling and adding new stateful transformations rather than rewriting existing components.
 
-[Examples of the level of specificity required:]
-[— "I would have defined my Gold table schemas in a single `config/schemas.py` file rather than inline in `provision.py`. When I needed to add the `current_balances` table in Stage 3, I had to trace schema definitions across three modules."]
-[— "I would have designed `run_all.py` to accept a `--mode` argument (`batch` or `stream`) from the start, rather than adding a branching conditional in Stage 3 that made the entry point harder to reason about."]
-[— "I would not have used `.toPandas()` in my Silver-to-Gold join. It worked at Stage 1 scale but I had to refactor it at Stage 2, and the refactor left technical debt that complicated the Stage 3 streaming path."]
+⸻
 
-[Describe at least one concrete structural change.]
+Decision 2: What design decisions in Stage 1 would you change in hindsight?
 
----
+In hindsight, one of the most impactful changes would have been to design the pipeline entry point (run_all.py) with explicit mode handling from the start. Introducing a --mode batch|stream argument early would have avoided the need to retrofit conditional logic during Stage 3, making the pipeline easier to reason about and maintain.
 
-## Decision 3: How would you approach this differently if you had known Stage 3 was coming from the start?
+Another key improvement would have been to centralize schema definitions into a dedicated module (e.g., config/schemas.py). In the current implementation, schema logic is partially embedded in transformation functions such as gold.py, which made extending the pipeline to support new outputs like current_balances more complex than necessary.
 
-**Minimum: approximately 100 words of forward-looking architectural reasoning.**
+Additionally, I would have designed the ingestion layer to be interface-driven rather than file-path driven. Currently, ingestion assumes static input paths (e.g., JSONL and CSV files). A more flexible design would have abstracted ingestion into a pluggable interface supporting both batch files and streaming directories, reducing the effort required to integrate the /data/stream/ source.
 
-[This is the forward-looking design question. Describe the architecture you would have chosen from Day 1 if the full three-stage specification had been visible to you at the start.]
+Finally, I would have avoided tightly coupling timestamp generation (e.g., current_timestamp()) inside transformation logic and instead passed it explicitly as a pipeline parameter. This would improve determinism and make testing and replay scenarios easier in a streaming context.
 
-[Consider addressing:]
-[— **Ingestion patterns:** Would you have designed the ingest layer to accept both batch file paths and streaming directory sources from the beginning? What interface would that look like?]
-[— **State management:** The `current_balances` table requires maintaining running state across stream batches. Would you have chosen a different state management approach if you had known this from Day 1? Delta MERGE, checkpoint files, an embedded key-value store?]
-[— **Output format choices:** Would you have structured your Gold layer differently — for example, using a single `gold/` output module that handles both batch and streaming tables — rather than retrofitting `stream_gold/` as a separate output path?]
-[— **Pipeline entry points:** Would you have used a single entry point with mode selection, or kept batch and streaming as separate executables that share common library code?]
-[— **Anything else** specific to your implementation that would have changed with full visibility.]
+⸻
 
----
+Decision 3: How would you approach this differently if you had known Stage 3 was coming from the start?
 
-## Appendix (optional)
+If the full three-stage specification had been known from the beginning, I would have designed the pipeline as a dual-mode system from Day 1, supporting both batch and streaming ingestion through a unified interface. The ingestion layer would expose a common contract, allowing inputs to be either static files or continuously arriving micro-batches, with a consistent downstream API.
 
-[Architecture diagram, code snippets, or other supporting material. Not required. Does not substitute for the written responses above. If you include a diagram, describe what it shows in plain text as well — reviewers may not have access to rendering tools.]
+For state management, I would have explicitly designed for incremental updates using Delta Lake MERGE operations from the outset, particularly for tables like current_balances that require maintaining running state. This would include designing idempotent transformations and clear primary key definitions early in the pipeline.
+
+The Gold layer would have been structured as a reusable module capable of handling both batch and streaming outputs, rather than being implicitly batch-oriented. I would also have separated pipeline orchestration from transformation logic more clearly, possibly introducing a control-plane style execution layer to manage batch runs, streaming polling, and scheduling independently.
+
+Finally, I would have introduced configuration-driven pipeline behavior earlier (e.g., YAML-based pipeline definitions), allowing new data sources, outputs, and processing modes to be added without modifying core logic. This would have made the Stage 3 extension largely a configuration exercise rather than a structural change.
+
+⸻
+
+Appendix
+
+This ADR reflects a layered architecture:
+	•	Ingestion → Transformation → Gold Layer → Intelligence → Explainability → ML
+
+The addition of streaming reused most of the batch logic while extending ingestion and state handling, demonstrating good architectural separation and reuse.

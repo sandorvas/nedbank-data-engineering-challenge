@@ -23,7 +23,7 @@ flowchart LR
     B --> C[Ingestion Module]
 
     C --> D[Transformation Layer]
-    D --> E[Gold Layer (Delta)]
+    D --> E[Gold Layer - Delta]
 
     E --> F[current_balances]
     E --> G[recent_transactions]

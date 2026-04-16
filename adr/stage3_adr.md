@@ -15,8 +15,9 @@ Prior to Stage 3, the pipeline had already evolved through Stage 1 and Stage 2 i
 
 ⸻
 
-Architecture Overview (Block Diagram)
+Architecture Overview
 
+```mermaid
 flowchart LR
     A[Stream JSONL Files] --> B[Polling Layer]
     B --> C[Ingestion Module]
@@ -32,12 +33,13 @@ flowchart LR
     I --> J[Explainability]
 
     E --> K[DuckDB Analytics]
-
+```
 
 ⸻
 
-Streaming Processing Flow (Sequence Diagram)
+Streaming Processing Flow
 
+```mermaid
 sequenceDiagram
     participant FS as /data/stream/
     participant Poller
@@ -52,7 +54,7 @@ sequenceDiagram
     Transform->>Gold: Build fact + dimensions
     Gold->>Delta: MERGE / UPSERT
     Delta-->>Gold: Commit success
-
+```
 
 ⸻
 
